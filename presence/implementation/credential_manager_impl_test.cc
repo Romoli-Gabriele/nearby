@@ -155,7 +155,7 @@ TEST_F(CredentialManagerImplTest, CreateOneCredentialSuccessfully) {
   EXPECT_EQ(private_credential.key_seed().size(),
             CredentialManagerImpl::kAuthenticityKeyByteSize);
   EXPECT_FALSE(private_credential.connection_signing_key().key().empty());
-  EXPECT_EQ(private_credential.metadata_encryption_key().size(),
+  EXPECT_EQ(private_credential.metadata_encryption_key_v0().size(),
             kBaseMetadataSize);
 
   SharedCredential public_credential = credentials.second;
@@ -170,9 +170,9 @@ TEST_F(CredentialManagerImplTest, CreateOneCredentialSuccessfully) {
   EXPECT_GE(public_credential.end_time_millis(), absl::ToUnixMillis(kEndTime));
   EXPECT_LE(public_credential.end_time_millis(),
             absl::ToUnixMillis(kEndTime + absl::Hours(3)));
-  EXPECT_EQ(Crypto::Sha256(private_credential.metadata_encryption_key())
+  EXPECT_EQ(Crypto::Sha256(private_credential.metadata_encryption_key_v0())
                 .AsStringView(),
-            public_credential.metadata_encryption_key_tag());
+            public_credential.metadata_encryption_key_unsigned_adv_tag());
   EXPECT_FALSE(
       public_credential.connection_signature_verification_key().empty());
   EXPECT_FALSE(public_credential.encrypted_metadata_bytes().empty());
@@ -180,7 +180,7 @@ TEST_F(CredentialManagerImplTest, CreateOneCredentialSuccessfully) {
   // Decrypt the device metadata
 
   auto decrypted_metadata = credential_manager_.DecryptMetadata(
-      private_credential.metadata_encryption_key(),
+      private_credential.metadata_encryption_key_v0(),
       public_credential.key_seed(),
       public_credential.encrypted_metadata_bytes());
 
