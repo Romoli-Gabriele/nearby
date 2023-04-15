@@ -45,6 +45,7 @@ message V1Frame {
     PAIRED_KEY_ENCRYPTION = 7;
     AUTHENTICATION_MESSAGE = 8;
     AUTHENTICATION_RESULT = 9;
+    RECONNECT_INTRODUCTION = 10;
   }
   optional FrameType type = 1;
 
@@ -58,6 +59,7 @@ message V1Frame {
   optional PairedKeyEncryptionFrame paired_key_encryption = 8;
   optional AuthenticationMessageFrame authentication_message = 9;
   optional AuthenticationResultFrame authentication_result = 10;
+  optional ReconnectIntroductionFrame reconnect_introduction = 11;
 }
 
 message ConnectionRequestFrame {
@@ -167,6 +169,7 @@ message PayloadTransferFrame {
     optional int32 flags = 1;
     optional int64 offset = 2;
     optional bytes body = 3;
+    optional int32 index = 4;
   }
 
   // Accompanies CONTROL packets.
@@ -176,10 +179,12 @@ message PayloadTransferFrame {
       PAYLOAD_ERROR = 1;
       PAYLOAD_CANCELED = 2;
       PAYLOAD_RECEIVED_ACK = 3;
+      PAYLOAD_CHUNK_RECEIVED_ACK = 4;
     }
 
     optional EventType event = 1;
     optional int64 offset = 2;
+    optional int32 received_chunk_index = 3;
   }
 
   optional PacketType packet_type = 1;
@@ -188,6 +193,10 @@ message PayloadTransferFrame {
   // Exactly one of the following fields will be set, depending on the type.
   optional PayloadChunk payload_chunk = 3;
   optional ControlMessage control_message = 4;
+}
+
+message ReconnectIntroductionFrame {
+  optional string endpoint_id = 1;
 }
 
 message BandwidthUpgradeNegotiationFrame {
