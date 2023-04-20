@@ -571,3 +571,23 @@ enum PreferencesActionStatus {
   PREFERENCES_ACTION_STATUS_SUCCESS = 1;
   PREFERENCES_ACTION_STATUS_FAIL = 2;
 }
+
+// The state of the receive surface.
+enum ReceiveSurfaceState {
+  RECEIVE_STATE_UNKNOWN = 0;
+
+  // Background receive surface advertises only to contacts.
+  RECEIVE_STATE_BACKGROUND = 1;
+  // Foreground receive surface advertises to everyone.
+  RECEIVE_STATE_FOREGROUND = 2;
+}
+
+// The state of the send surface.
+enum SendSurfaceState {
+  SEND_STATE_UNKNOWN = 0;
+
+  // Background send surface only listens to transfer update.
+  SEND_STATE_BACKGROUND = 1;
+  // Foreground send surface both scans and listens to transfer update.
+  SEND_STATE_FOREGROUND = 2;
+}
