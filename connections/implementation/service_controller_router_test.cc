@@ -32,6 +32,10 @@
 #include "connections/implementation/service_controller.h"
 #include "connections/listeners.h"
 #include "connections/params.h"
+#include "connections/v3/bandwidth_info.h"
+#include "connections/v3/connection_result.h"
+#include "connections/v3/connections_device.h"
+#include "connections/v3/params.h"
 #include "internal/platform/byte_array.h"
 #include "internal/platform/condition_variable.h"
 #include "internal/platform/mutex.h"
@@ -45,6 +49,28 @@ using ::testing::Return;
 constexpr std::array<char, 6> kFakeMacAddress = {'a', 'b', 'c', 'd', 'e', 'f'};
 constexpr std::array<char, 6> kFakeInjectedEndpointInfo = {'g', 'h', 'i'};
 const char kFakeInejctedEndpointId[] = "abcd";
+
+v3::Quality ConvertMediumToQuality(Medium medium) {
+  switch (medium) {
+    case location::nearby::proto::connections::USB:
+    case location::nearby::proto::connections::UNKNOWN_MEDIUM:
+      return v3::Quality::kUnknown;
+    case location::nearby::proto::connections::BLE:
+    case location::nearby::proto::connections::NFC:
+      return v3::Quality::kLow;
+    case location::nearby::proto::connections::BLUETOOTH:
+    case location::nearby::proto::connections::BLE_L2CAP:
+      return v3::Quality::kMedium;
+    case location::nearby::proto::connections::WIFI_HOTSPOT:
+    case location::nearby::proto::connections::WIFI_LAN:
+    case location::nearby::proto::connections::WIFI_AWARE:
+    case location::nearby::proto::connections::WIFI_DIRECT:
+    case location::nearby::proto::connections::WEB_RTC:
+      return v3::Quality::kHigh;
+    default:
+      return v3::Quality::kUnknown;
+  }
+}
 }  // namespace
 
 // This class must be in the same namespace as ServiceControllerRouter for
@@ -258,6 +284,156 @@ class ServiceControllerRouterTest : public testing::Test {
     EXPECT_FALSE(client->IsConnectedToEndpoint(endpoint_id));
   }
 
+  void RequestConnectionV3(ClientProxy* client,
+                           const NearbyDevice& remote_device,
+                           v3::ConnectionRequestInfo request_info,
+                           ResultCallback callback) {
+    EXPECT_CALL(*mock_, RequestConnection)
+        .WillOnce(Return(Status{Status::kSuccess}));
+    ConnectionOptions connection_options;
+    {
+      MutexLock lock(&mutex_);
+      complete_ = false;
+      router_.RequestConnectionV3(client, remote_device, request_info,
+                                  connection_options, callback);
+      while (!complete_) cond_.Wait();
+      EXPECT_EQ(result_, Status{Status::kSuccess});
+    }
+    ConnectionResponseInfo response_info{
+        .remote_endpoint_info = ByteArray{"endpoint_name"},
+        .authentication_token = "auth_token",
+        .raw_authentication_token = ByteArray{"auth_token"},
+        .is_incoming_connection = true,
+    };
+    std::string connection_token{"conntokn"};
+    ConnectionListener old_listener = {
+        .initiated_cb = [v3_cb = request_info.listener.initiated_cb](
+                            const std::string& endpoint_id,
+                            const ConnectionResponseInfo& info) {},
+        .accepted_cb =
+            [v3_cb = request_info.listener.result_cb](
+                const std::string& endpoint_id) {
+              v3_cb(v3::ConnectionsDevice(endpoint_id, "", {}),
+                    v3::ConnectionResult{
+                        .status = Status{Status::kSuccess},
+                    });
+            },
+        .rejected_cb =
+            [v3_cb = request_info.listener.result_cb](
+                const std::string& endpoint_id, Status status) {
+              v3_cb(v3::ConnectionsDevice(endpoint_id, "", {}),
+                    v3::ConnectionResult{.status = status});
+            },
+        .disconnected_cb =
+            [v3_cb = request_info.listener.disconnected_cb](
+                const std::string& endpoint_id) {
+              v3_cb(v3::ConnectionsDevice(endpoint_id, "", {}));
+            },
+        .bandwidth_changed_cb =
+            [v3_cb = request_info.listener.bandwidth_changed_cb](
+                const std::string& endpoint_id, Medium medium) {
+              v3::BandwidthInfo info = {
+                  .quality = ConvertMediumToQuality(medium),
+                  .medium = medium,
+              };
+              v3_cb(v3::ConnectionsDevice(endpoint_id, "", {}), info);
+            }};
+    client->OnConnectionInitiated(remote_device.GetEndpointId(), response_info,
+                                  connection_options, old_listener,
+                                  connection_token);
+    EXPECT_TRUE(
+        client->HasPendingConnectionToEndpoint(remote_device.GetEndpointId()));
+  }
+
+  void AcceptConnectionV3(ClientProxy* client,
+                          const NearbyDevice& remote_device,
+                          const ResultCallback& callback) {
+    EXPECT_CALL(*mock_, AcceptConnection)
+        .WillOnce(Return(Status{Status::kSuccess}));
+    // Pre-condition for successful Accept is: connection must exist.
+    EXPECT_TRUE(
+        client->HasPendingConnectionToEndpoint(remote_device.GetEndpointId()));
+    {
+      MutexLock lock(&mutex_);
+      complete_ = false;
+      router_.AcceptConnectionV3(client, remote_device, {}, callback);
+      while (!complete_) cond_.Wait();
+      EXPECT_EQ(result_, Status{Status::kSuccess});
+    }
+    auto endpoint_id = remote_device.GetEndpointId();
+    client->LocalEndpointAcceptedConnection(endpoint_id, {});
+    client->RemoteEndpointAcceptedConnection(endpoint_id);
+    EXPECT_TRUE(client->IsConnectionAccepted(endpoint_id));
+    client->OnConnectionAccepted(endpoint_id);
+    EXPECT_TRUE(client->IsConnectedToEndpoint(endpoint_id));
+  }
+
+  void RejectConnectionV3(ClientProxy* client, const std::string endpoint_id,
+                          ResultCallback callback) {
+    EXPECT_CALL(*mock_, RejectConnection)
+        .WillOnce(Return(Status{Status::kSuccess}));
+    // Pre-condition for successful Accept is: connection must exist.
+    EXPECT_TRUE(client->HasPendingConnectionToEndpoint(endpoint_id));
+    {
+      MutexLock lock(&mutex_);
+      complete_ = false;
+      router_.RejectConnection(client, endpoint_id, callback);
+      while (!complete_) cond_.Wait();
+      EXPECT_EQ(result_, Status{Status::kSuccess});
+    }
+    client->LocalEndpointRejectedConnection(endpoint_id);
+    EXPECT_TRUE(client->IsConnectionRejected(endpoint_id));
+  }
+
+  void InitiateBandwidthUpgradeV3(ClientProxy* client,
+                                  const std::string endpoint_id,
+                                  ResultCallback callback) {
+    EXPECT_CALL(*mock_, InitiateBandwidthUpgrade).Times(1);
+    EXPECT_TRUE(client->IsConnectedToEndpoint(endpoint_id));
+    {
+      MutexLock lock(&mutex_);
+      complete_ = false;
+      router_.InitiateBandwidthUpgrade(client, endpoint_id, callback);
+      while (!complete_) cond_.Wait();
+      EXPECT_EQ(result_, Status{Status::kSuccess});
+    }
+  }
+
+  void SendPayloadV3(ClientProxy* client,
+                     const std::vector<std::string>& endpoint_ids,
+                     Payload payload, ResultCallback callback) {
+    EXPECT_CALL(*mock_, SendPayload).Times(1);
+
+    bool connected = false;
+    for (const auto& endpoint_id : endpoint_ids) {
+      connected = connected || client->IsConnectedToEndpoint(endpoint_id);
+    }
+    EXPECT_TRUE(connected);
+    {
+      MutexLock lock(&mutex_);
+      complete_ = false;
+      router_.SendPayload(client, absl::MakeSpan(endpoint_ids),
+                          std::move(payload), callback);
+      while (!complete_) cond_.Wait();
+      EXPECT_EQ(result_, Status{Status::kSuccess});
+    }
+  }
+
+  void DisconnectFromDeviceV3(ClientProxy* client,
+                              const NearbyDevice& remote_device,
+                              ResultCallback callback) {
+    EXPECT_CALL(*mock_, DisconnectFromEndpoint).Times(1);
+    EXPECT_TRUE(client->IsConnectedToEndpoint(remote_device.GetEndpointId()));
+    {
+      MutexLock lock(&mutex_);
+      complete_ = false;
+      router_.DisconnectFromDeviceV3(client, remote_device, callback);
+      while (!complete_) cond_.Wait();
+    }
+    client->OnDisconnected(remote_device.GetEndpointId(), false);
+    EXPECT_FALSE(client->IsConnectedToEndpoint(remote_device.GetEndpointId()));
+  }
+
  protected:
   const ResultCallback kCallback{
       .result_cb =
@@ -429,6 +605,74 @@ TEST_F(ServiceControllerRouterTest, CancelPayloadCalled) {
 }
 
 TEST_F(ServiceControllerRouterTest, DisconnectFromEndpointCalled) {
+  // Either Adviertisng, or Discovery should be ongoing.
+  StartDiscovery(&client_, kServiceId, kDiscoveryOptions, discovery_listener_,
+                 kCallback);
+  // Establish connection.
+  RequestConnection(&client_, kRemoteEndpointId, kConnectionRequestInfo,
+                    kCallback);
+  // Now, we can accept connection.
+  AcceptConnection(&client_, kRemoteEndpointId, kCallback);
+  // We can disconnect at any time after RequestConnection.
+  DisconnectFromEndpoint(&client_, kRemoteEndpointId, kCallback);
+}
+
+TEST_F(ServiceControllerRouterTest, AcceptConnectionCalledV3) {
+  // Either Adviertisng, or Discovery should be ongoing.
+  StartDiscovery(&client_, kServiceId, kDiscoveryOptions, discovery_listener_,
+                 kCallback);
+  // Establish connection.
+  auto device = v3::ConnectionsDevice(kRemoteEndpointId, "", {});
+  auto local_device =
+      v3::ConnectionsDevice(client_.GetLocalEndpointId(), kRequestorName, {});
+  auto new_connection_info = v3::ConnectionRequestInfo{
+      .local_device = local_device,
+      .listener = {},
+  };
+  RequestConnectionV3(&client_, device, new_connection_info, kCallback);
+  // Now, we can accept connection.
+  AcceptConnection(&client_, kRemoteEndpointId, kCallback);
+}
+
+TEST_F(ServiceControllerRouterTest, RejectConnectionCalledV3) {
+  // Either Adviertisng, or Discovery should be ongoing.
+  StartDiscovery(&client_, kServiceId, kDiscoveryOptions, discovery_listener_,
+                 kCallback);
+  // Establish connection.
+  RequestConnection(&client_, kRemoteEndpointId, kConnectionRequestInfo,
+                    kCallback);
+  // Now, we can reject connection.
+  RejectConnection(&client_, kRemoteEndpointId, kCallback);
+}
+
+TEST_F(ServiceControllerRouterTest, InitiateBandwidthUpgradeCalledV3) {
+  // Either Adviertisng, or Discovery should be ongoing.
+  StartDiscovery(&client_, kServiceId, kDiscoveryOptions, discovery_listener_,
+                 kCallback);
+  // Establish connection.
+  RequestConnection(&client_, kRemoteEndpointId, kConnectionRequestInfo,
+                    kCallback);
+  // Now, we can accept connection.
+  AcceptConnection(&client_, kRemoteEndpointId, kCallback);
+  // Now we can change connection bandwidth.
+  InitiateBandwidthUpgrade(&client_, kRemoteEndpointId, kCallback);
+}
+
+TEST_F(ServiceControllerRouterTest, SendPayloadCalledV3) {
+  // Either Adviertisng, or Discovery should be ongoing.
+  StartDiscovery(&client_, kServiceId, kDiscoveryOptions, discovery_listener_,
+                 kCallback);
+  // Establish connection.
+  RequestConnection(&client_, kRemoteEndpointId, kConnectionRequestInfo,
+                    kCallback);
+  // Now, we can accept connection.
+  AcceptConnection(&client_, kRemoteEndpointId, kCallback);
+  // Now we can send payload.
+  SendPayload(&client_, std::vector<std::string>{kRemoteEndpointId},
+              Payload{ByteArray("data")}, kCallback);
+}
+
+TEST_F(ServiceControllerRouterTest, DisconnectFromEndpointCalledV3) {
   // Either Adviertisng, or Discovery should be ongoing.
   StartDiscovery(&client_, kServiceId, kDiscoveryOptions, discovery_listener_,
                  kCallback);

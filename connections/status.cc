@@ -51,6 +51,8 @@ std::string Status::ToString() const {
       return "kWifiLanError";
     case Status::kPayloadUnknown:
       return "kPayloadUnknown";
+    case Status::kConnectionAccepted:
+      return "kConnectionAccepted";
   }
 }
 

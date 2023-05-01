@@ -15,6 +15,8 @@
 #ifndef THIRD_PARTY_NEARBY_CONNECTIONS_V3_LISTENERS_H_
 #define THIRD_PARTY_NEARBY_CONNECTIONS_V3_LISTENERS_H_
 
+#include <functional>
+
 #include "absl/functional/any_invocable.h"
 #include "connections/listeners.h"
 #include "connections/v3/bandwidth_info.h"
@@ -43,8 +45,8 @@ struct ConnectionListener {
   //
   // remote_device - The identifier for the remote endpoint.
   // info -  Other relevant information about the connection.
-  absl::AnyInvocable<void(const NearbyDevice& remote_device,
-                          const v3::InitialConnectionInfo& info)>
+  std::function<void(const NearbyDevice& remote_device,
+                     const v3::InitialConnectionInfo& info)>
       initiated_cb =
           [](const NearbyDevice&, const v3::InitialConnectionInfo&) {};
 
@@ -56,23 +58,23 @@ struct ConnectionListener {
 
   // remote_device - The identifier for the remote endpoint.
   // resolution    - The resolution of the connection (accepted or rejected).
-  absl::AnyInvocable<void(const NearbyDevice& remote_device,
-                          ConnectionResult resolution)>
+  std::function<void(const NearbyDevice& remote_device,
+                     ConnectionResult resolution)>
       result_cb = [](const NearbyDevice&, ConnectionResult) {};
 
   // Called when a remote endpoint is disconnected or has become unreachable.
   // At this point service (re-)discovery may start again.
   //
   // remote_device - The identifier for the remote endpoint.
-  absl::AnyInvocable<void(const NearbyDevice& remote_device)> disconnected_cb =
+  std::function<void(const NearbyDevice& remote_device)> disconnected_cb =
       [](const NearbyDevice&) {};
 
   // Called when the connection's available bandwidth has changed.
   //
   // remote_device - The identifier for the remote endpoint.
   // bandwidth_info - Bandwidth info about the new medium that was upgraded to.
-  absl::AnyInvocable<void(const NearbyDevice& remote_device,
-                          BandwidthInfo bandwidth_info)>
+  std::function<void(const NearbyDevice& remote_device,
+                     BandwidthInfo bandwidth_info)>
       bandwidth_changed_cb = [](const NearbyDevice&, BandwidthInfo) {};
 };
 
@@ -81,8 +83,8 @@ struct DiscoveryListener {
   //
   // remote_device - The remote device that was discovered.
   // service_id    - The ID of the service advertised by the remote endpoint.
-  absl::AnyInvocable<void(const NearbyDevice& remote_device,
-                          const absl::string_view service_id)>
+  std::function<void(const NearbyDevice& remote_device,
+                     const absl::string_view service_id)>
       endpoint_found_cb = [](const NearbyDevice&, const absl::string_view) {};
 
   // Called when a remote endpoint is no longer discoverable; only called for
@@ -90,7 +92,7 @@ struct DiscoveryListener {
   // #onEndpointFound(String, DiscoveredEndpointInfo)}.
   //
   // remote_device - The ID of the remote endpoint that was lost.
-  absl::AnyInvocable<void(const NearbyDevice& remote_device)> endpoint_lost_cb =
+  std::function<void(const NearbyDevice& remote_device)> endpoint_lost_cb =
       [](const NearbyDevice&) {};
 
   // Called when a remote endpoint is found with an updated distance.
@@ -98,7 +100,7 @@ struct DiscoveryListener {
   // arguments:
   //   remote_device - The ID of the remote endpoint that was lost.
   //   info          - The distance info, encoded as enum value.
-  absl::AnyInvocable<void(const NearbyDevice& remote_device, DistanceInfo info)>
+  std::function<void(const NearbyDevice& remote_device, DistanceInfo info)>
       endpoint_distance_changed_cb = [](const NearbyDevice&, DistanceInfo) {};
 };
 
@@ -111,7 +113,8 @@ struct PayloadListener {
   // remote_device - The identifier for the remote endpoint that sent the
   //               payload.
   // payload     - The Payload object received.
-  absl::AnyInvocable<void(const NearbyDevice& remote_device, Payload payload)>
+  absl::AnyInvocable<void(const NearbyDevice& remote_device, Payload payload)
+                         const>
       payload_received_cb = [](const NearbyDevice&, Payload) {};
 
   // Called with progress information about an active Payload transfer, either

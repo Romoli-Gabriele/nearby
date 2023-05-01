@@ -42,6 +42,7 @@ struct Status {
     kBleError,
     kWifiLanError,
     kPayloadUnknown,
+    kConnectionAccepted,
   };
   Value value{kError};
   bool Ok() const { return value == kSuccess; }
