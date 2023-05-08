@@ -661,7 +661,6 @@ void ClientProxy::CancelAllEndpoints() {
     }
     cancellation_flag->Cancel();
   }
-  cancellation_flags_.clear();
 }
 
 void ClientProxy::OnPayload(const std::string& endpoint_id, Payload payload) {

@@ -326,7 +326,11 @@ class ClientProxy final {
   // endpoints after each scan.
   absl::flat_hash_set<std::string> discovered_endpoint_ids_;
 
-  // Maps endpoint_id to CancellationFlag.
+  // Maps endpoint_id to CancellationFlag. CancellationFlags are passed around
+  // as raw pointers to other classes in Nearby Connections, so it is important
+  // that objects in this map are not cleared, even if they are cancelled, since
+  // other classes will check for `CancellationFlag::Cancelled()`, and if this
+  // map is cleared, then there will be crashes for accessing garbage memory.
   absl::flat_hash_map<std::string, std::unique_ptr<CancellationFlag>>
       cancellation_flags_;
   // A default cancellation flag with isCancelled set be true.
