@@ -87,6 +87,14 @@ class WebRtc {
       const location::nearby::connections::LocationHint& location_hint,
       CancellationFlag* cancellation_flag) ABSL_LOCKS_EXCLUDED(mutex_);
 
+ protected:
+  // Use for unit tests only to inject a WebRtcMedium.
+  explicit WebRtc(std::unique_ptr<WebRtcMedium> medium);
+
+  // Used in unit tests to determine how many calls to `AttemptToConnect`
+  // occured during a call to `Connect`.
+  int num_connect_attempts_count_ = 0;
+
  private:
   static constexpr int kConnectAttemptsLimit = 3;
   static constexpr int kRestartAcceptConnectionsLimit = 3;
@@ -225,7 +233,7 @@ class WebRtc {
 
   Mutex mutex_;
 
-  WebRtcMedium medium_;
+  std::unique_ptr<WebRtcMedium> medium_;
 
   // The single thread we throw the potentially blocking work on to.
   ScheduledExecutor single_thread_executor_;

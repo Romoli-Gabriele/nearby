@@ -20,12 +20,14 @@ cc_library(
         "fake_clock.cc",
         "fake_task_runner.cc",
         "fake_timer.cc",
+        "fake_webrtc.cc",
     ],
     hdrs = [
         "fake_clock.h",
         "fake_device_info.h",
         "fake_task_runner.h",
         "fake_timer.h",
+        "fake_webrtc.h",
     ],
     copts = [
         "-Ithird_party",
@@ -33,6 +35,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//internal/base:bluetooth_address",
+        "//internal/platform:comm",
         "//internal/platform:types",
         "//internal/platform/implementation:types",
         "@com_google_absl//absl/base:core_headers",

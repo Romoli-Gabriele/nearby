@@ -411,6 +411,7 @@ cc_library(
         "//connections:__subpackages__",
         "//fastpair:__subpackages__",
         "//internal/platform/implementation:__subpackages__",
+        "//internal/test:__subpackages__",
         "//location/nearby/cpp:__subpackages__",
         "//presence:__subpackages__",
     ],
