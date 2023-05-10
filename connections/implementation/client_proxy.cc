@@ -630,7 +630,6 @@ void ClientProxy::CancelEndpoint(const std::string& endpoint_id) {
   const auto item = cancellation_flags_.find(endpoint_id);
   if (item == cancellation_flags_.end()) return;
   item->second->Cancel();
-  cancellation_flags_.erase(item);
 }
 
 const OsInfo& ClientProxy::GetLocalOsInfo() const {
