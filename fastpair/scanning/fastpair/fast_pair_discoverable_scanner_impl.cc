@@ -115,9 +115,9 @@ void FastPairDiscoverableScannerImpl::OnDeviceFound(
 
   FastPairDataParser::GetHexModelIdFromServiceData(
       service_data,
-      {[this, peripheral](std::optional<absl::string_view> model_id) {
+      [this, peripheral](std::optional<absl::string_view> model_id) {
         OnModelIdRetrieved(peripheral.GetName(), model_id);
-      }});
+      });
 }
 
 void FastPairDiscoverableScannerImpl::OnModelIdRetrieved(
