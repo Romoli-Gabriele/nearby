@@ -39,6 +39,8 @@ namespace nearby {
 namespace fastpair {
 
 namespace {
+using Iterator =
+    absl::flat_hash_map<std::string, std::unique_ptr<FastPairDevice>>::iterator;
 constexpr char kNearbyShareModelId[] = "fc128e";
 
 bool IsValidDeviceType(const proto::Device& device) {
@@ -182,11 +184,16 @@ void FastPairDiscoverableScannerImpl::OnDeviceMetadataRetrieved(
                             "Ignoring this advertisement";
     return;
   }
-  MutexLock lock(&mutex_);
-  notified_devices_.insert_or_assign(
-      address, std::make_unique<FastPairDevice>(
-                   model_id, address, Protocol::kFastPairInitialPairing));
-  NotifyDeviceFound(*notified_devices_[address]);
+  Iterator it;
+  {
+    MutexLock lock(&mutex_);
+    it = notified_devices_
+             .insert_or_assign(address, std::make_unique<FastPairDevice>(
+                                            model_id, address,
+                                            Protocol::kFastPairInitialPairing))
+             .first;
+  }
+  NotifyDeviceFound(*it->second);
 }
 
 void FastPairDiscoverableScannerImpl::NotifyDeviceFound(
@@ -200,15 +207,21 @@ void FastPairDiscoverableScannerImpl::NotifyDeviceFound(
 void FastPairDiscoverableScannerImpl::OnDeviceLost(
     const BlePeripheral& peripheral) {
   NEARBY_LOGS(INFO) << __func__ << ": Running lost callback";
-  MutexLock lock(&mutex_);
-  model_id_parse_attempts_.erase(peripheral.GetName());
+  Iterator it;
+  {
+    MutexLock lock(&mutex_);
+    model_id_parse_attempts_.erase(peripheral.GetName());
 
-  auto it = notified_devices_.find(peripheral.GetName());
+    it = notified_devices_.find(peripheral.GetName());
 
-  // Don't invoke callback if we didn't notify this device.
-  if (it == notified_devices_.end()) return;
+    // Don't invoke callback if we didn't notify this device.
+    if (it == notified_devices_.end()) return;
+  }
   lost_callback_(*it->second);
-  notified_devices_.erase(it);
+  {
+    MutexLock lock(&mutex_);
+    notified_devices_.erase(it);
+  }
 }
 
 }  // namespace fastpair
