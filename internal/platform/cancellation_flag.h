@@ -41,6 +41,9 @@ class CancellationFlag {
   // Set the flag as cancelled.
   void Cancel() ABSL_LOCKS_EXCLUDED(mutex_);
 
+  // Set the flag as uncancelled.
+  void Uncancel() ABSL_LOCKS_EXCLUDED(mutex_);
+
   // Returns true if the flag has been set to cancelled.
   bool Cancelled() const ABSL_LOCKS_EXCLUDED(mutex_);
 

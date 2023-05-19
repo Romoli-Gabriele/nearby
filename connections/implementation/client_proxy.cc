@@ -621,6 +621,7 @@ void ClientProxy::AddCancellationFlag(const std::string& endpoint_id) {
 
   auto item = cancellation_flags_.find(endpoint_id);
   if (item != cancellation_flags_.end()) {
+    item->second->Uncancel();
     return;
   }
   cancellation_flags_.emplace(endpoint_id,
