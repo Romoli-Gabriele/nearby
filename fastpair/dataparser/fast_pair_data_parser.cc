@@ -65,7 +65,7 @@ void ConvertVectorsToArrays(
 void FastPairDataParser::GetHexModelIdFromServiceData(
     const std::vector<uint8_t>& service_data,
     GetHexModelIdFromServiceDataCallback callback) {
-  callback.on_retrieved_cb(
+  callback(
       FastPairDecoder::HasModelId(&service_data)
           ? FastPairDecoder::GetHexModelIdFromServiceData(&service_data)
           : std::nullopt);
@@ -76,7 +76,7 @@ void FastPairDataParser::ParseDecryptedResponse(
     const std::vector<uint8_t>& encrypted_response_bytes,
     ParseDecryptResponseCallback callback) {
   if (!ValidateInputSizes(aes_key_bytes, encrypted_response_bytes)) {
-    callback.on_decrypted_cb(std::nullopt);
+    callback(std::nullopt);
     return;
   }
 
@@ -84,7 +84,7 @@ void FastPairDataParser::ParseDecryptedResponse(
   std::array<uint8_t, kEncryptedDataByteSize> bytes;
   ConvertVectorsToArrays(aes_key_bytes, encrypted_response_bytes, key, bytes);
 
-  callback.on_decrypted_cb(
+  callback(
       FastPairDecryption::ParseDecryptResponse(key, bytes));
 }
 
@@ -93,7 +93,7 @@ void FastPairDataParser::ParseDecryptedPasskey(
     const std::vector<uint8_t>& encrypted_passkey_bytes,
     ParseDecryptPasskeyCallback callback) {
   if (!ValidateInputSizes(aes_key_bytes, encrypted_passkey_bytes)) {
-    callback.on_decrypted_cb(std::nullopt);
+    callback(std::nullopt);
     return;
   }
 
@@ -101,7 +101,7 @@ void FastPairDataParser::ParseDecryptedPasskey(
   std::array<uint8_t, kEncryptedDataByteSize> bytes;
   ConvertVectorsToArrays(aes_key_bytes, encrypted_passkey_bytes, key, bytes);
 
-  callback.on_decrypted_cb(FastPairDecryption::ParseDecryptPasskey(key, bytes));
+  callback(FastPairDecryption::ParseDecryptPasskey(key, bytes));
 }
 
 }  // namespace fastpair
