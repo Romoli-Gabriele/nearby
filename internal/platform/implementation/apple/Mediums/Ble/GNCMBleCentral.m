@@ -248,11 +248,11 @@ GNCIntHandler GNCRecursiveIntHandler(void (^block)(GNCIntHandler blockSelf, int 
   } else {
     info.peripheral = peripheral;
   }
-   NSLog(@"[NEARBY] data: %@", info);
+   NSLog(@"[NEARBY] info: %@", info);
    NSLog(@"[NEARBY] data: %@", serviceData);
   _nearbyPeripheralsByID[peripheral.identifier] = info;
   _scanResultHandler(peripheral.identifier.UUIDString, serviceData);
-  NSLog(@"[NEARBY] data: %@", peripheral.identifier.UUIDString);
+  NSLog(@"[NEARBY] UUUID: %@", peripheral.identifier.UUIDString);
 }
 
 - (void)centralManager:(CBCentralManager *)central didConnectPeripheral:(CBPeripheral *)peripheral {
