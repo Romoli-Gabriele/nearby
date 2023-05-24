@@ -250,6 +250,10 @@ GNCIntHandler GNCRecursiveIntHandler(void (^block)(GNCIntHandler blockSelf, int 
   }
    NSLog(@"[NEARBY] info: %@", info);
    NSLog(@"[NEARBY] data: %@", serviceData);
+   if(serviceData.bytes){
+    dataString = [[NSString alloc] initWithData:serviceData encoding:NSUTF8StringEncoding];
+      NSLog(@"[NEARBY] data: %@",dataString);
+   }
   _nearbyPeripheralsByID[peripheral.identifier] = info;
   _scanResultHandler(peripheral.identifier.UUIDString, serviceData);
   NSLog(@"[NEARBY] UUUID: %@", peripheral.identifier.UUIDString);

@@ -158,6 +158,8 @@ extension Discoverer: InternalConnectionDelegate {
 extension Discoverer: InternalDiscoveryDelegate {
 
   func foundEndpoint(_ endpointID: String, withEndpointInfo info: Data) {
+    print("Found endpoint: \(endpointID)")
+    print("Endpoint info: \(info)")
     connectionManager.queue.async { [weak self] in
       guard let self = self else { return }
       self.delegate?.discoverer(self, didFind: endpointID, with: info)
