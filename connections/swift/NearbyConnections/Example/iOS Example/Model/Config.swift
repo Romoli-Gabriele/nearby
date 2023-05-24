@@ -21,14 +21,14 @@ import UIKit
 import NearbyConnections
 
 class Config {
-    static let serviceId = "com.google.location.nearby.apps.helloconnections"
+    static let serviceId = "SPOTLIVE"
     static let defaultStategy = Strategy.cluster
     static let defaultAdvertisingState = false
     static let defaultDiscoveryState = false
     static let bytePayload = "hello world"
 
 #if os(iOS) || os(watchOS) || os(tvOS)
-    static let defaultEndpointName = UIDevice.current.name
+    static let defaultEndpointName = "SPL::UIDevice.current.name"
 #elseif os(macOS)
     static let defaultEndpointName = Host.current().localizedName ?? "Unknown macOS Device"
 #else
