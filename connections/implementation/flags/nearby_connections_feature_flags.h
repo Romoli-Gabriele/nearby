@@ -30,7 +30,7 @@ namespace nearby_connections_feature {
 // LINT.IfChanged
 // Disable/Enable BLE v2 in Nearby Connections SDK.
 constexpr auto kEnableBleV2 =
-    flags::Flag<bool>(kConfigPackage, "45401515", false);
+    flags::Flag<bool>(kConfigPackage, "45401515", true);
 
 // The timeout in millis to report peripheral device lost.
 constexpr auto kBlePeripheralLostTimeoutMillis =
@@ -38,11 +38,11 @@ constexpr auto kBlePeripheralLostTimeoutMillis =
 
 // Enable/Disable GATT query during scanning.
 constexpr auto kEnableGattQueryInThread =
-    flags::Flag<bool>(kConfigPackage, "45415261", false);
+    flags::Flag<bool>(kConfigPackage, "45415261", true);
 
 // Enable/Disable payload manager to skip chunk update.
 constexpr auto kEnablePayloadManagerToSkipChunkUpdate =
-    flags::Flag<bool>(kConfigPackage, "45415729", false);
+    flags::Flag<bool>(kConfigPackage, "45415729", true);
 
 // LINT.ThenChange(
 //   //depot/google3/location/nearby/cpp/sharing/clients/cpp/nearby_sharing_service_adapter_dart.h,
