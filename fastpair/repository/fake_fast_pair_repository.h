@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef THIRD_PARTY_NEARBY_FASTPAIR_SERVER_ACCESS_FAKE_FAST_PAIR_REPOSITORY_H_
-#define THIRD_PARTY_NEARBY_FASTPAIR_SERVER_ACCESS_FAKE_FAST_PAIR_REPOSITORY_H_
+#ifndef THIRD_PARTY_NEARBY_FASTPAIR_REPOSITORY_FAKE_FAST_PAIR_REPOSITORY_H_
+#define THIRD_PARTY_NEARBY_FASTPAIR_REPOSITORY_FAKE_FAST_PAIR_REPOSITORY_H_
 
 #include <memory>
 #include <string>
@@ -21,7 +21,7 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
 #include "fastpair/common/device_metadata.h"
-#include "fastpair/server_access/fast_pair_repository.h"
+#include "fastpair/repository/fast_pair_repository.h"
 #include "internal/platform/single_thread_executor.h"
 
 namespace nearby {
@@ -38,9 +38,23 @@ class FakeFastPairRepository : public FastPairRepository {
 
   void SetFakeMetadata(absl::string_view hex_model_id, proto::Device metadata);
   void ClearFakeMetadata(absl::string_view hex_model_id);
+
   // FastPairRepository::
+  void AddObserver(Observer* observer) override{};
+  void RemoveObserver(Observer* observer) override{};
+
   void GetDeviceMetadata(absl::string_view hex_model_id,
                          DeviceMetadataCallback callback) override;
+
+  void GetUserSavedDevices() override{};
+
+  void WriteAccountAssociationToFootprints(
+      FastPairDevice& device,
+      OperationToFootprintsCallback callback) override{};
+
+  void DeleteAssociatedDeviceByAccountKey(
+      const AccountKey& account_key,
+      OperationToFootprintsCallback callback) override{};
 
  private:
   absl::flat_hash_map<std::string, std::unique_ptr<DeviceMetadata>> data_;
@@ -49,4 +63,4 @@ class FakeFastPairRepository : public FastPairRepository {
 }  // namespace fastpair
 }  // namespace nearby
 
-#endif  // THIRD_PARTY_NEARBY_FASTPAIR_SERVER_ACCESS_FAKE_FAST_PAIR_REPOSITORY_H_
+#endif  // THIRD_PARTY_NEARBY_FASTPAIR_REPOSITORY_FAKE_FAST_PAIR_REPOSITORY_H_

@@ -36,7 +36,6 @@ cc_library(
     deps = [
         "//fastpair/common",
         "//fastpair/repository",
-        "//fastpair/server_access",
         "//internal/base",
         "//internal/platform:logging",
         "@com_google_absl//absl/functional:any_invocable",
@@ -105,7 +104,6 @@ cc_test(
         ":fast_pair_ui",
         "//fastpair/common",
         "//fastpair/proto:fastpair_cc_proto",
-        "//fastpair/server_access:test_support",
         "//internal/platform:types",
         "//internal/platform/implementation/g3",  # build_cleaner: keep
         "@com_github_protobuf_matchers//protobuf-matchers",

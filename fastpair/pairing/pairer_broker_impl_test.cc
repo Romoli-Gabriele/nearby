@@ -33,7 +33,7 @@
 #include "fastpair/handshake/fast_pair_handshake_lookup.h"
 #include "fastpair/internal/mediums/mediums.h"
 #include "fastpair/pairing/fastpair/fast_pair_pairer.h"
-#include "fastpair/server_access/fake_fast_pair_repository.h"
+#include "fastpair/repository/fake_fast_pair_repository.h"
 #include "internal/base/bluetooth_address.h"
 #include "internal/platform/ble_v2.h"
 #include "internal/platform/count_down_latch.h"
@@ -186,10 +186,12 @@ class PairerBrokerImplTest : public testing::Test {
       device_->SetAccountKey(AccountKey(account_key_));
     }
     CountDownLatch latch(1);
-    repository_->GetDeviceMetadata(kMetadataId, [&](DeviceMetadata& metadata) {
-      device_->SetMetadata(std::move(metadata));
-      latch.CountDown();
-    });
+    repository_->GetDeviceMetadata(
+        kMetadataId, [&](std::optional<DeviceMetadata> metadata) {
+          EXPECT_TRUE(metadata.has_value());
+          device_->SetMetadata(std::move(metadata.value()));
+          latch.CountDown();
+        });
     latch.Await();
   }
 

@@ -38,6 +38,7 @@
 #include "connections/v3/connections_device.h"
 #include "connections/v3/listeners.h"
 #include "internal/flags/nearby_flags.h"
+#include "internal/interop/device.h"
 #include "internal/platform/base64_utils.h"
 #include "internal/platform/bluetooth_connection_info.h"
 #include "internal/platform/bluetooth_utils.h"
@@ -351,24 +352,29 @@ Status BasePcpHandler::StartDiscovery(ClientProxy* client,
                     << GetStringValueOfSupportedMediums(
                            stripped_discovery_options);
   RunOnPcpHandlerThread(
-      "start-discovery", [this, client, service_id, stripped_discovery_options,
-                          &listener, &response]() RUN_ON_PCP_HANDLER_THREAD() {
-        // Ask the implementation to attempt to start discovery.
-        auto result =
-            StartDiscoveryImpl(client, service_id, stripped_discovery_options);
-        if (!result.status.Ok()) {
-          response.Set(result.status);
-          return;
-        }
+      "start-discovery",
+      [this, client, service_id, stripped_discovery_options, &listener,
+       &response]() RUN_ON_PCP_HANDLER_THREAD()
+          ABSL_LOCKS_EXCLUDED(discovered_endpoint_mutex_) {
+            // Ask the implementation to attempt to start discovery.
+            auto result = StartDiscoveryImpl(client, service_id,
+                                             stripped_discovery_options);
+            if (!result.status.Ok()) {
+              response.Set(result.status);
+              return;
+            }
 
-        // Now that we've succeeded, mark the client as discovering and clear
-        // out any old endpoints we had discovered.
-        discovered_endpoints_.clear();
-        client->StartedDiscovery(service_id, GetStrategy(), listener,
-                                 absl::MakeSpan(result.mediums),
-                                 stripped_discovery_options);
-        response.Set({Status::kSuccess});
-      });
+            // Now that we've succeeded, mark the client as discovering and
+            // clear out any old endpoints we had discovered.
+            {
+              MutexLock lock(&discovered_endpoint_mutex_);
+              discovered_endpoints_.clear();
+            }
+            client->StartedDiscovery(service_id, GetStrategy(), listener,
+                                     absl::MakeSpan(result.mediums),
+                                     stripped_discovery_options);
+            response.Set({Status::kSuccess});
+          });
   return WaitForResult(absl::StrCat("StartDiscovery(", service_id, ")"),
                        client->GetClientId(), &response);
 }
@@ -830,6 +836,7 @@ void BasePcpHandler::StripOutUnavailableMediums(
 // Get any single discovered endpoint for a given endpoint_id.
 BasePcpHandler::DiscoveredEndpoint* BasePcpHandler::GetDiscoveredEndpoint(
     const std::string& endpoint_id) {
+  MutexLock lock(&discovered_endpoint_mutex_);
   auto it = discovered_endpoints_.find(endpoint_id);
   if (it == discovered_endpoints_.end()) {
     return nullptr;
@@ -840,6 +847,7 @@ BasePcpHandler::DiscoveredEndpoint* BasePcpHandler::GetDiscoveredEndpoint(
 std::vector<BasePcpHandler::DiscoveredEndpoint*>
 BasePcpHandler::GetDiscoveredEndpoints(const std::string& endpoint_id) {
   std::vector<BasePcpHandler::DiscoveredEndpoint*> result;
+  MutexLock lock(&discovered_endpoint_mutex_);
   auto it = discovered_endpoints_.equal_range(endpoint_id);
   for (auto item = it.first; item != it.second; item++) {
     result.push_back(item->second.get());
@@ -856,6 +864,7 @@ std::vector<BasePcpHandler::DiscoveredEndpoint*>
 BasePcpHandler::GetDiscoveredEndpoints(
     const location::nearby::proto::connections::Medium medium) {
   std::vector<BasePcpHandler::DiscoveredEndpoint*> result;
+  MutexLock lock(&discovered_endpoint_mutex_);
   for (const auto& item : discovered_endpoints_) {
     if (item.second->medium == medium) {
       result.push_back(item.second.get());
@@ -1181,7 +1190,7 @@ void BasePcpHandler::OnEndpointFound(
   // Check if we've seen this endpoint ID before.
   std::string& endpoint_id = endpoint->endpoint_id;
   NEARBY_LOGS(INFO) << "OnEndpointFound: id=" << endpoint_id << " [enter]";
-
+  MutexLock lock(&discovered_endpoint_mutex_);
   auto range = discovered_endpoints_.equal_range(endpoint->endpoint_id);
   bool is_range_empty = range.first == range.second;
   DiscoveredEndpoint* owned_endpoint = nullptr;
@@ -1234,7 +1243,7 @@ void BasePcpHandler::OnEndpointLost(
     ClientProxy* client, const BasePcpHandler::DiscoveredEndpoint& endpoint) {
   // Look up the DiscoveredEndpoint we have in our cache.
   NEARBY_LOGS(INFO) << "OnEndpointLost: id=" << endpoint.endpoint_id;
-
+  MutexLock lock(&discovered_endpoint_mutex_);
   auto range = discovered_endpoints_.equal_range(endpoint.endpoint_id);
   bool is_range_empty = range.first == range.second;
   if (is_range_empty) {
@@ -1371,7 +1380,8 @@ bool BasePcpHandler::IsPreferred(
 Exception BasePcpHandler::OnIncomingConnection(
     ClientProxy* client, const ByteArray& remote_endpoint_info,
     std::unique_ptr<EndpointChannel> channel,
-    location::nearby::proto::connections::Medium medium) {
+    location::nearby::proto::connections::Medium medium,
+    NearbyDevice::Type listening_device_type) {
   absl::Time start_time = SystemClock::ElapsedRealtime();
 
   //  Fixes an NPE in ClientProxy.OnConnectionAccepted. The crash happened when
@@ -1437,6 +1447,22 @@ Exception BasePcpHandler::OnIncomingConnection(
   if (client->ShouldEnforceTopologyConstraints() &&
       !CanReceiveIncomingConnection(client)) {
     NEARBY_LOGS(ERROR) << "Incoming connections are currently disallowed.";
+    return {Exception::kIo};
+  }
+
+  // Make sure we only accept connections from the device type we're explicitly
+  // listening to.
+  NearbyDevice::Type incoming_type =
+      connection_request.has_connections_device()
+          ? NearbyDevice::Type::kConnectionsDevice
+      : connection_request.has_presence_device()
+          ? NearbyDevice::Type::kPresenceDevice
+          // Legacy clients will be treated as Connections devices.
+          : NearbyDevice::Type::kConnectionsDevice;
+  if (listening_device_type != incoming_type) {
+    NEARBY_LOGS(WARNING) << "Device requesting a connection is the wrong type."
+                         << "Expected type: " << listening_device_type
+                         << ", got type: " << incoming_type;
     return {Exception::kIo};
   }
 
@@ -1601,6 +1627,7 @@ bool BasePcpHandler::AppendRemoteBluetoothMacAddressEndpoint(
   if (!local_discovery_options.allowed.bluetooth) {
     return false;
   }
+  MutexLock lock(&discovered_endpoint_mutex_);
 
   auto it = discovered_endpoints_.equal_range(endpoint_id);
   if (it.first == it.second) {
@@ -1646,6 +1673,7 @@ bool BasePcpHandler::AppendWebRTCEndpoint(
   if (!local_discovery_options.allowed.web_rtc) {
     return false;
   }
+  MutexLock lock(&discovered_endpoint_mutex_);
 
   bool should_connect_web_rtc = false;
   auto it = discovered_endpoints_.equal_range(endpoint_id);
