@@ -160,8 +160,9 @@ GNCIntHandler GNCRecursiveIntHandler(void (^block)(GNCIntHandler blockSelf, int 
     _centralManager =
         [[CBCentralManager alloc] initWithDelegate:self
                                             queue:_selfQueue
-                                          options:@{CBCentralManagerOptionShowPowerAlertKey : @NO,
-                                                    CBCentralManagerOptionRestoreIdentifierKey: @"myBluetoothCentral"}];
+                                          options:@{CBCentralManagerOptionShowPowerAlertKey : @NO
+                                          //,CBCentralManagerOptionRestoreIdentifierKey: @"myBluetoothCentral"
+                                          }];
 
 
   // Set up the central manager for the socket.
