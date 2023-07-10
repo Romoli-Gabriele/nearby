@@ -157,10 +157,12 @@ GNCIntHandler GNCRecursiveIntHandler(void (^block)(GNCIntHandler blockSelf, int 
   _callbacksEnabled = YES;
 
   // Set up the central manager for scanning.
-  _centralManager =
-      [[CBCentralManager alloc] initWithDelegate:self
-                                           queue:_selfQueue
-                                         options:@{CBCentralManagerOptionShowPowerAlertKey : @NO}];
+    _centralManager =
+        [[CBCentralManager alloc] initWithDelegate:self
+                                            queue:_selfQueue
+                                          options:@{CBCentralManagerOptionShowPowerAlertKey : @NO,
+                                                    CBCentralManagerOptionRestoreIdentifierKey: @"myBluetoothCentral"}];
+
 
   // Set up the central manager for the socket.
   _socketCentralManager = [[GNSCentralManager alloc] initWithSocketServiceUUID:_serviceUUID

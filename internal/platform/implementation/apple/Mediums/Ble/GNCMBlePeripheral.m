@@ -163,7 +163,9 @@ typedef NS_ENUM(NSUInteger, GNCMPeripheralState) {
   _peripheralManager = [[CBPeripheralManager alloc]
       initWithDelegate:self
                  queue:_selfQueue
-               options:@{CBPeripheralManagerOptionShowPowerAlertKey : @NO}];
+                        options:@{ CBPeripheralManagerOptionShowPowerAlertKey : @NO,
+                                CBPeripheralManagerOptionRestoreIdentifierKey : @"myPeriferalManager"
+                                }];
 
   if (_GATTService) {
     if (_gattCharacteristics && _gattCharacteristics.count > 0) {
